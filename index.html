@@ -1,1 +1,29 @@
-app.use(express.static("public"));
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vapi-Like Realtime AI</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <h1>Vapi-Like AI Assistant</h1>
+    
+    <!-- Status koji pokazuje šta se dešava u realnom vremenu -->
+    <div id="status" class="status-idle">Pritisni dugme za početak...</div>
+
+    <textarea id="message" placeholder="Ovdje će se pojavljivati ono što izgovoriš..."></textarea>
+
+    <div class="buttons">
+      <button id="startBtn" class="btn-start">🚀 Pokreni Razgovor</button>
+      <button id="stopBtn" class="btn-stop" disabled>🛑 Zaustavi</button>
+    </div>
+
+    <div id="response" placeholder="AI Odgovor..."></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
