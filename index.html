@@ -6,7 +6,6 @@
   <title>Vapi-Like Realtime AI</title>
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -16,9 +15,13 @@
     
     <div id="status" class="status-idle">Pritisni dugme za početak...</div>
 
+    <div class="api-box" style="margin-bottom: 15px; width: 100%;">
+      <input type="password" id="groqKeyInput" placeholder="🔐 Unesi svoj Groq API ključ (gsk_...)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #222; color: #fff; box-sizing: border-box;" />
+    </div>
+
     <textarea id="message" placeholder="Upiši pitanje ovdje..."></textarea>
 
-<button id="sendBtn" class="btn-send">🚀 Pošalji poruku</button>
+    <button id="sendBtn" class="btn-send">🚀 Pošalji poruku</button>
 
     <div class="buttons">
       <button id="startBtn" class="btn-start">🚀 Pokreni Razgovor</button>
