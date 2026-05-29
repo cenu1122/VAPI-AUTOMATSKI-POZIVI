@@ -1,3 +1,16 @@
+// ==========================================
+// 1. SUPABASE KONFIGURACIJA & INICIJALIZACIJA
+// ==========================================
+const SUPABASE_URL = "https://fbvwvkjurcbdnbrfknig.supabase.co";
+const SUPABASE_KEY = "sb_publishable_eV8H-_ck4SgcNZDqdV_6iA__-Fy-Mmi";
+
+// Kreiranje Supabase klijenta (koristi učitani CDN iz index.html)
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+console.log("Supabase je uspješno inicijalizovan!");
+
+// ==========================================
+// 2. SELEKTORI ELEMENATA
+// ==========================================
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const messageInput = document.getElementById("message");
@@ -8,17 +21,18 @@ let recognition;
 let isSpeakingAI = false;
 let currentSpeechUtterance = null;
 
-// Provjera podrške za ugrađeni besplatni Speech-to-Text
+// ==========================================
+// 3. SPEECH-TO-TEXT (STT) LOGIKA
+// ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (!SpeechRecognition) {
     alert("Tvoj pretraživač ne podržava besplatni Speech-to-Text. Pokušaj u Google Chrome.");
 } else {
     recognition = new SpeechRecognition();
-    recognition.continuous = true; // Drži mikrofon stalno upaljenim
+    recognition.continuous = true; 
     recognition.interimResults = false; 
-    recognition.lang = "en-US"; // Postavi na "bs-BA" ako tvoj AI model na backendu prihvata bosanski
+    recognition.lang = "en-US"; 
 
-    // Kada pretraživač završi procesuiranje tvog glasa u tekst
     recognition.onresult = async (event) => {
         const lastResultIndex = event.results.length - 1;
         const transcript = event.results[lastResultIndex][0].transcript.trim();
@@ -26,7 +40,7 @@ if (!SpeechRecognition) {
         if (transcript.length > 0) {
             messageInput.value = transcript;
             
-            // LOGIKA PREKIDANJA (Vapi Style): Ako ti progovoriš dok AI još priča -> UGASI GOVOR ODMAH
+            // LOGIKA PREKIDANJA (Vapi Style): Ako klijent progovori dok AI priča -> ugasi audio odmah
             if (isSpeakingAI && speechSynthesis.speaking) {
                 console.log("Korisnik je prekinuo AI. Zaustavljam audio...");
                 speechSynthesis.cancel(); 
@@ -35,7 +49,7 @@ if (!SpeechRecognition) {
                 statusDiv.className = "status-listening";
             }
 
-            // Šalji tekst na lokalni backend
+            // Šalji tekst na backend
             await sendToBackend(transcript);
         }
     };
@@ -53,21 +67,22 @@ if (!SpeechRecognition) {
     };
 
     recognition.onend = () => {
-        // Ako se mikrofon ugasi sam od sebe, ponovo ga pokreni da održiš živu vezu
         if (!stopBtn.disabled) {
             recognition.start();
         }
     };
 }
 
-// Slanje teksta na backend server
+// ==========================================
+// 4. SLANJE NA BACKEND & SPAŠAVANJE U BAZU
+// ==========================================
 async function sendToBackend(textMessage) {
     statusDiv.innerText = "🤔 AI razmišlja...";
     statusDiv.className = "status-thinking";
     responseDiv.innerHTML = "Generišem odgovor...";
 
     try {
-        // Dok testiraš lokalno, tvoj backend radi na localhost:3000
+        // Slanje zahtjeva tvom lokalnom serveru koji procesira AI (Node.js/Python)
         const response = await fetch("http://localhost:3000/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -75,11 +90,16 @@ async function sendToBackend(textMessage) {
         });
 
         const data = await response.json();
+        const aiReply = data.reply;
         
-        responseDiv.innerHTML = data.reply;
+        responseDiv.innerHTML = aiReply;
         
         // Pokreni glasovni odgovor
-        speakAI(data.reply);
+        speakAI(aiReply);
+
+        // --- SUPABASE AUTOMATSKO ZAPISIVANJE ---
+        // Ova funkcija šalje podatke u Supabase tabelu 'pozivi'
+        await spasiRazgovorUBazu(textMessage, aiReply);
 
     } catch (error) {
         console.error("Greška pri spajanju na backend:", error);
@@ -88,9 +108,34 @@ async function sendToBackend(textMessage) {
     }
 }
 
-// Besplatan Text-to-Speech (Ugrađeni glas u pretraživaču)
+// Pomoćna funkcija koja upisuje podatke direktno u Supabase
+async function spasiRazgovorUBazu(korisnikTekst, aiTekst) {
+    try {
+        const { data, error } = await supabase
+            .from('pozivi') // Ime tabele u Supabase bazi
+            .insert([
+                { 
+                    user_message: korisnikTekst, 
+                    ai_response: aiTekst, 
+                    created_at: new Date() 
+                }
+            ]);
+
+        if (error) {
+            console.error("Supabase greška pri upisu:", error.message);
+        } else {
+            console.log("Razgovor uspješno sačuvan u Supabase bazni sef!");
+        }
+    } catch (err) {
+        console.error("Sistemska greška pri slanju u bazu:", err);
+    }
+}
+
+// ==========================================
+// 5. TEXT-TO-SPEECH (TTS) LOGIKA
+// ==========================================
 function speakAI(text) {
-    speechSynthesis.cancel(); // Očisti prethodni govor ako postoji
+    speechSynthesis.cancel(); 
 
     currentSpeechUtterance = new SpeechSynthesisUtterance(text);
     currentSpeechUtterance.lang = "en-US"; 
@@ -110,7 +155,9 @@ function speakAI(text) {
     speechSynthesis.speak(currentSpeechUtterance);
 }
 
-// Kontrole na klik dugmića
+// ==========================================
+// 6. KONTROLE DUGMIĆA
+// ==========================================
 startBtn.addEventListener("click", () => {
     startBtn.disabled = true;
     stopBtn.disabled = false;
