@@ -1,3 +1,10 @@
+Evo kompletnog i izmijenjenog koda za app.js.
+
+Ovaj kod sada povlači ključ iz onog novog polja što smo dodali u index.html. Da ti ne bi morao ukucavati ključ svaki put kada osvježiš stranicu, dodao sam i automatsko spašavanje ključa u memoriju pretraživača (localStorage). Čim ga uneseš prvi put, stranica će ga zapamtiti!
+
+Samo kopiraj ovaj cijeli tekst i zamijeni sve unutar svog app.js fajla na GitHubu:
+JavaScript
+
 // ==========================================
 // 1. SUPABASE KONFIGURACIJA & INICIJALIZACIJA
 // ==========================================
@@ -16,10 +23,16 @@ const messageInput = document.getElementById("message");
 const responseDiv = document.getElementById("response");
 const statusDiv = document.getElementById("status");
 const sendBtn = document.getElementById("sendBtn"); 
+const groqKeyInput = document.getElementById("groqKeyInput"); // Novo polje za ključ!
 
 let recognition;
 let isSpeakingAI = false;
 let currentSpeechUtterance = null;
+
+// AUTOMATSKO UCITAVANJE KLJUCA: Ako si vec nekad unio kljuc, povuci ga iz memorije
+if (groqKeyInput && localStorage.getItem("saved_groq_key")) {
+    groqKeyInput.value = localStorage.getItem("saved_groq_key");
+}
 
 // ==========================================
 // 3. SPEECH-TO-TEXT (STT) LOGIKA
@@ -74,17 +87,29 @@ function provjeriIPrekiniAI() {
 }
 
 // ==========================================
-// 4. SLANJE NA BACKEND & SPAŠAVANJE U BAZU
+// 4. SLANJE NA GROQ API & SPAŠAVANJE U BAZU
 // ==========================================
 async function sendToBackend(textMessage) {
+    // Uzmi ključ iz polja na stranici
+    const GROQ_API_KEY = groqKeyInput ? groqKeyInput.value.trim() : "";
+
+    // Provjera da li je korisnik uopšte unio ključ
+    if (!GROQ_API_KEY) {
+        statusDiv.innerText = "❌ Greška: Nedostaje API ključ!";
+        statusDiv.className = "status-idle";
+        responseDiv.innerHTML = "Molimo unesite vaš Groq API ključ u polje na vrhu stranice.";
+        return;
+    }
+
+    // Spasi ključ u memoriju pretraživača da se ne mora kucati ponovo
+    localStorage.setItem("saved_groq_key", GROQ_API_KEY);
+
     statusDiv.innerText = "🤔 AI razmišlja...";
     statusDiv.className = "status-thinking";
     responseDiv.innerHTML = "Generišem odgovor...";
 
-    // ⚠️ OVDJE UBACI SVOJ PRAVI KLJUČ IZ GROQ KONSOLE (gsk_...)
-    const GROQ_API_KEY = "TVOJ_PRAVI_GROQ_KLJUČ_OVDJE"; 
-
     try {
+        // Šaljemo direktan zahtjev na službeni Groq API server
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -101,16 +126,24 @@ async function sendToBackend(textMessage) {
         });
 
         const data = await response.json();
+        
+        // Provjera da li je Groq vratio grešku zbog nevažećeg ključa
+        if (data.error) {
+            throw new Error(data.error.message);
+        }
+
         const aiReply = data.choices[0].message.content;
         
         responseDiv.innerHTML = aiReply;
         speakAI(aiReply);
 
+        // Zapiši podatke u Supabase
         await spasiRazgovorUBazu(textMessage, aiReply);
 
     } catch (error) {
-        console.error("Greška pri spajanju na Groq API:", error);
-        statusDiv.innerText = "❌ Greška pri preuzimanju odgovora sa Groq-a!";
+        console.error("Greška:", error);
+        statusDiv.innerText = "❌ Greška pri komunikaciji sa AI!";
+        responseDiv.innerHTML = "Došlo je do greške: " + error.message;
         statusDiv.className = "status-idle";
     }
 }
@@ -162,7 +195,7 @@ function speakAI(text) {
 }
 
 // ==========================================
-// 6. LOGIKA ZA KLIK NA DUGME "POŠALJI"
+// 6. LOGIKA ZA KLIK NA DUGME "POŠALJI PORUKU"
 // ==========================================
 if (sendBtn) {
     sendBtn.addEventListener("click", async () => {
@@ -170,22 +203,22 @@ if (sendBtn) {
         
         if (typedText !== "") {
             provjeriIPrekiniAI(); 
-            messageInput.value = ""; // Odmah isprazni box čim klikneš
+            messageInput.value = ""; // Odmah isprazni box čim klikneš dugme
             await sendToBackend(typedText); 
         }
     });
 }
 
-// Ako pritisne Enter unutar polja, simulira klik na dugme Pošalji
+// Slušalac za pritisak tipke Enter unutar tekstualnog polja
 messageInput.addEventListener("keydown", async (event) => {
     if (event.key === "Enter") {
-        event.preventDefault(); 
-        if (sendBtn) sendBtn.click(); 
+        event.preventDefault(); // Zaustavi prelazak u novi red
+        if (sendBtn) sendBtn.click(); // Okini klik na dugme za slanje
     }
 });
 
 // ==========================================
-// 7. KONTROLE OSTAHA DUGMIĆA
+// 7. KONTROLE OSTALIH DUGMIĆA
 // ==========================================
 startBtn.addEventListener("click", () => {
     startBtn.disabled = true;
