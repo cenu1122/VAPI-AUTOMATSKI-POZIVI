@@ -15,6 +15,7 @@ const stopBtn = document.getElementById("stopBtn");
 const messageInput = document.getElementById("message");
 const responseDiv = document.getElementById("response");
 const statusDiv = document.getElementById("status");
+const sendBtn = document.getElementById("sendBtn"); // Novo dugme!
 
 let recognition;
 let isSpeakingAI = false;
@@ -38,11 +39,7 @@ if (!SpeechRecognition) {
         
         if (transcript.length > 0) {
             messageInput.value = transcript;
-            
-            // LOGIKA PREKIDANJA: Ako klijent progovori dok AI priča -> ugasi audio odmah
             provjeriIPrekiniAI();
-
-            // Šalji tekst na backend
             await sendToBackend(transcript);
         }
     };
@@ -66,7 +63,6 @@ if (!SpeechRecognition) {
     };
 }
 
-// Pomoćna funkcija za prekidanje govora AI-ja ako korisnik reaguje (kucanjem ili glasom)
 function provjeriIPrekiniAI() {
     if (isSpeakingAI && speechSynthesis.speaking) {
         console.log("Korisnik je prekinuo AI. Zaustavljam audio...");
@@ -86,8 +82,6 @@ async function sendToBackend(textMessage) {
     responseDiv.innerHTML = "Generišem odgovor...";
 
     try {
-        // NAPOMENA: Pošto smo na Vercelu, privremeno šalje na localhost, 
-        // ali ovdje kasnije možeš staviti tvoj pravi Vercel URL
         const response = await fetch("http://localhost:3000/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -98,11 +92,9 @@ async function sendToBackend(textMessage) {
         const aiReply = data.reply;
         
         responseDiv.innerHTML = aiReply;
-        
-        // Pokreni glasovni odgovor
         speakAI(aiReply);
 
-        // --- SUPABASE AUTOMATSKO ZAPISIVANJE ---
+        // Spremanje u Supabase bazu
         await spasiRazgovorUBazu(textMessage, aiReply);
 
     } catch (error) {
@@ -127,7 +119,7 @@ async function spasiRazgovorUBazu(korisnikTekst, aiTekst) {
         if (error) {
             console.error("Supabase greška pri upisu:", error.message);
         } else {
-            console.log("Razgovor uspješno sačuvan u Supabase bazni sef!");
+            console.log("Razgovor uspješno sačuvan u Supabase bazi!");
         }
     } catch (err) {
         console.error("Sistemska greška pri slanju u bazu:", err);
@@ -159,28 +151,30 @@ function speakAI(text) {
 }
 
 // ==========================================
-// 6. LOGIKA ZA TIPKANJE PITANJA (Novo!)
+// 6. LOGIKA ZA KLIK NA DUGME "POŠALJI" (Novo & Sigurno!)
 // ==========================================
-messageInput.addEventListener("keydown", async (event) => {
-    // Ako korisnik pritisne 'Enter' i polje nije prazno
-    if (event.key === "Enter" && messageInput.value.trim() !== "") {
-        event.preventDefault(); // Sprječava novi red u inputu
-        
+if (sendBtn) {
+    sendBtn.addEventListener("click", async () => {
         const typedText = messageInput.value.trim();
         
-        // Ako AI priča, a mi krenemo tipkati i opali se Enter -> prekini AI govor odmah
-        provjeriIPrekiniAI();
-        
-        // Pošalji natipkano pitanje na backend
-        await sendToBackend(typedText);
-        
-        // Isprazni polje za unos nakon slanja
-        messageInput.value = "";
+        if (typedText !== "") {
+            provjeriIPrekiniAI(); // Utišaj AI ako trenutno brblja
+            await sendToBackend(typedText); // Pošalji poruku backendu
+            messageInput.value = ""; // Isprazni prozor za kucanje
+        }
+    });
+}
+
+// Rezervna opcija: Ako ipak pritisneš Enter unutar polja, da odradi isto što i dugme
+messageInput.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") {
+        event.preventDefault(); // Zaustavi fabričko ponašanje (novi red ili refresh)
+        if (sendBtn) sendBtn.click(); // Automatski "klikni" na naše novo dugme
     }
 });
 
 // ==========================================
-// 7. KONTROLE DUGMIĆA
+// 7. KONTROLE OSTALIH DUGMIĆA
 // ==========================================
 startBtn.addEventListener("click", () => {
     startBtn.disabled = true;
