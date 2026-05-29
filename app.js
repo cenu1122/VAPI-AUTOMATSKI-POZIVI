@@ -4,7 +4,6 @@
 const SUPABASE_URL = "https://fbvwvkjurcbdnbrfknig.supabase.co";
 const SUPABASE_KEY = "sb_publishable_eV8H-_ck4SgcNZDqdV_6iA__-Fy-Mmi";
 
-// Kreiranje Supabase klijenta (koristi učitani CDN iz index.html)
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 console.log("Supabase je uspješno inicijalizovan!");
 
@@ -40,14 +39,8 @@ if (!SpeechRecognition) {
         if (transcript.length > 0) {
             messageInput.value = transcript;
             
-            // LOGIKA PREKIDANJA (Vapi Style): Ako klijent progovori dok AI priča -> ugasi audio odmah
-            if (isSpeakingAI && speechSynthesis.speaking) {
-                console.log("Korisnik je prekinuo AI. Zaustavljam audio...");
-                speechSynthesis.cancel(); 
-                isSpeakingAI = false;
-                statusDiv.innerText = "Prekinuo si AI. Slušam te...";
-                statusDiv.className = "status-listening";
-            }
+            // LOGIKA PREKIDANJA: Ako klijent progovori dok AI priča -> ugasi audio odmah
+            provjeriIPrekiniAI();
 
             // Šalji tekst na backend
             await sendToBackend(transcript);
@@ -73,6 +66,17 @@ if (!SpeechRecognition) {
     };
 }
 
+// Pomoćna funkcija za prekidanje govora AI-ja ako korisnik reaguje (kucanjem ili glasom)
+function provjeriIPrekiniAI() {
+    if (isSpeakingAI && speechSynthesis.speaking) {
+        console.log("Korisnik je prekinuo AI. Zaustavljam audio...");
+        speechSynthesis.cancel(); 
+        isSpeakingAI = false;
+        statusDiv.innerText = "Prekinuo si AI. Slušam te...";
+        statusDiv.className = "status-listening";
+    }
+}
+
 // ==========================================
 // 4. SLANJE NA BACKEND & SPAŠAVANJE U BAZU
 // ==========================================
@@ -82,7 +86,8 @@ async function sendToBackend(textMessage) {
     responseDiv.innerHTML = "Generišem odgovor...";
 
     try {
-        // Slanje zahtjeva tvom lokalnom serveru koji procesira AI (Node.js/Python)
+        // NAPOMENA: Pošto smo na Vercelu, privremeno šalje na localhost, 
+        // ali ovdje kasnije možeš staviti tvoj pravi Vercel URL
         const response = await fetch("http://localhost:3000/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -98,7 +103,6 @@ async function sendToBackend(textMessage) {
         speakAI(aiReply);
 
         // --- SUPABASE AUTOMATSKO ZAPISIVANJE ---
-        // Ova funkcija šalje podatke u Supabase tabelu 'pozivi'
         await spasiRazgovorUBazu(textMessage, aiReply);
 
     } catch (error) {
@@ -108,11 +112,10 @@ async function sendToBackend(textMessage) {
     }
 }
 
-// Pomoćna funkcija koja upisuje podatke direktno u Supabase
 async function spasiRazgovorUBazu(korisnikTekst, aiTekst) {
     try {
         const { data, error } = await supabase
-            .from('pozivi') // Ime tabele u Supabase bazi
+            .from('pozivi') 
             .insert([
                 { 
                     user_message: korisnikTekst, 
@@ -156,18 +159,39 @@ function speakAI(text) {
 }
 
 // ==========================================
-// 6. KONTROLE DUGMIĆA
+// 6. LOGIKA ZA TIPKANJE PITANJA (Novo!)
+// ==========================================
+messageInput.addEventListener("keydown", async (event) => {
+    // Ako korisnik pritisne 'Enter' i polje nije prazno
+    if (event.key === "Enter" && messageInput.value.trim() !== "") {
+        event.preventDefault(); // Sprječava novi red u inputu
+        
+        const typedText = messageInput.value.trim();
+        
+        // Ako AI priča, a mi krenemo tipkati i opali se Enter -> prekini AI govor odmah
+        provjeriIPrekiniAI();
+        
+        // Pošalji natipkano pitanje na backend
+        await sendToBackend(typedText);
+        
+        // Isprazni polje za unos nakon slanja
+        messageInput.value = "";
+    }
+});
+
+// ==========================================
+// 7. KONTROLE DUGMIĆA
 // ==========================================
 startBtn.addEventListener("click", () => {
     startBtn.disabled = true;
     stopBtn.disabled = false;
-    recognition.start();
+    if (recognition) recognition.start();
 });
 
 stopBtn.addEventListener("click", () => {
     startBtn.disabled = false;
     stopBtn.disabled = true;
-    recognition.stop();
+    if (recognition) recognition.stop();
     speechSynthesis.cancel();
     isSpeakingAI = false;
     statusDiv.innerText = "Razgovor zaustavljen.";
