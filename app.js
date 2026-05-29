@@ -15,7 +15,7 @@ const stopBtn = document.getElementById("stopBtn");
 const messageInput = document.getElementById("message");
 const responseDiv = document.getElementById("response");
 const statusDiv = document.getElementById("status");
-const sendBtn = document.getElementById("sendBtn"); // Novo dugme!
+const sendBtn = document.getElementById("sendBtn"); 
 
 let recognition;
 let isSpeakingAI = false;
@@ -81,25 +81,36 @@ async function sendToBackend(textMessage) {
     statusDiv.className = "status-thinking";
     responseDiv.innerHTML = "Generišem odgovor...";
 
+    // ⚠️ OVDJE UBACI SVOJ PRAVI KLJUČ IZ GROQ KONSOLE (gsk_...)
+    const GROQ_API_KEY = "TVOJ_PRAVI_GROQ_KLJUČ_OVDJE"; 
+
     try {
-        const response = await fetch("http://localhost:3000/chat", {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: textMessage })
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${GROQ_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: "llama3-8b-8192", 
+                messages: [
+                    { role: "system", content: "Ti si koristan AI glasovni asistent." },
+                    { role: "user", content: textMessage }
+                ]
+            })
         });
 
         const data = await response.json();
-        const aiReply = data.reply;
+        const aiReply = data.choices[0].message.content;
         
         responseDiv.innerHTML = aiReply;
         speakAI(aiReply);
 
-        // Spremanje u Supabase bazu
         await spasiRazgovorUBazu(textMessage, aiReply);
 
     } catch (error) {
-        console.error("Greška pri spajanju na backend:", error);
-        statusDiv.innerText = "❌ Greška: Provjeri da li ti je pokrenut backend server!";
+        console.error("Greška pri spajanju na Groq API:", error);
+        statusDiv.innerText = "❌ Greška pri preuzimanju odgovora sa Groq-a!";
         statusDiv.className = "status-idle";
     }
 }
@@ -151,30 +162,30 @@ function speakAI(text) {
 }
 
 // ==========================================
-// 6. LOGIKA ZA KLIK NA DUGME "POŠALJI" (Novo & Sigurno!)
+// 6. LOGIKA ZA KLIK NA DUGME "POŠALJI"
 // ==========================================
 if (sendBtn) {
     sendBtn.addEventListener("click", async () => {
         const typedText = messageInput.value.trim();
         
         if (typedText !== "") {
-            provjeriIPrekiniAI(); // Utišaj AI ako trenutno brblja
-            await sendToBackend(typedText); // Pošalji poruku backendu
-            messageInput.value = ""; // Isprazni prozor za kucanje
+            provjeriIPrekiniAI(); 
+            messageInput.value = ""; // Odmah isprazni box čim klikneš
+            await sendToBackend(typedText); 
         }
     });
 }
 
-// Rezervna opcija: Ako ipak pritisneš Enter unutar polja, da odradi isto što i dugme
+// Ako pritisne Enter unutar polja, simulira klik na dugme Pošalji
 messageInput.addEventListener("keydown", async (event) => {
     if (event.key === "Enter") {
-        event.preventDefault(); // Zaustavi fabričko ponašanje (novi red ili refresh)
-        if (sendBtn) sendBtn.click(); // Automatski "klikni" na naše novo dugme
+        event.preventDefault(); 
+        if (sendBtn) sendBtn.click(); 
     }
 });
 
 // ==========================================
-// 7. KONTROLE OSTALIH DUGMIĆA
+// 7. KONTROLE OSTAHA DUGMIĆA
 // ==========================================
 startBtn.addEventListener("click", () => {
     startBtn.disabled = true;
