@@ -1,10 +1,10 @@
 // ==========================================
 // 1. SUPABASE KONFIGURACIJA & INICIJALIZACIJA
 // ==========================================
-const SUPABASE_URL = "https://fbvwvkjurcbdnbrfknig.supabase.co";
-const SUPABASE_KEY = "sb_publishable_eV8H-_ck4SgcNZDqdV_6iA__-Fy-Mmi";
+ SUPABASE_URL = "https://fbvwvkjurcbdnbrfknig.supabase.co";
+ SUPABASE_KEY = "sb_publishable_eV8H-_ck4SgcNZDqdV_6iA__-Fy-Mmi";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 console.log("Supabase je uspješno inicijalizovan!");
 
 // ==========================================
