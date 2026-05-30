@@ -195,12 +195,34 @@ async function spasiRazgovorUBazu(korisnikTekst, aiTekst) {
     }
 }
 
-// TEXT-TO-SPEECH (TTS)
+// TEXT-TO-SPEECH (TTS) - POBOLJŠANI PRIRODNI GLAS
 function speakAI(text) {
     speechSynthesis.cancel(); 
 
     currentSpeechUtterance = new SpeechSynthesisUtterance(text);
-    currentSpeechUtterance.lang = "en-US"; 
+    
+    // Pokušavamo pronaći ljepši Google glas za naš region
+    const sveUsklađeneOpcije = speechSynthesis.getVoices();
+    
+    // Tražimo redom: hrvatski, srpski, bosanski ili bilo koji Google prirodni glas
+    const ljepšiGlas = sveUsklađeneOpcije.find(voice => 
+        voice.lang.startsWith('hr') || 
+        voice.lang.startsWith('sr') || 
+        voice.lang.startsWith('bs') ||
+        (voice.name.includes('Google') && (voice.lang.includes('hr') || voice.lang.includes('sr')))
+    );
+
+    if (ljepšiGlas) {
+        currentSpeechUtterance.voice = ljepšiGlas;
+        currentSpeechUtterance.lang = ljepšiGlas.lang;
+    } else {
+        // Ako ne nađe lokalni, stavljamo standardni prepoznatljivi EX-YU kod
+        currentSpeechUtterance.lang = "hr-HR"; 
+    }
+
+    // Blago podešavanje brzine i tonaliteta da zvuči ljudskije
+    currentSpeechUtterance.rate = 1.0;  // Brzina govora (1.0 je normalno)
+    currentSpeechUtterance.pitch = 1.0; // Tonalitet (1.0 je normalno)
 
     currentSpeechUtterance.onstart = () => {
         isSpeakingAI = true;
