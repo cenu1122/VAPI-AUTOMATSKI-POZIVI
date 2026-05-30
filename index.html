@@ -146,7 +146,7 @@ async function sendToBackend(textMessage) {
                "Authorization": `Bearer ${GROQ_API_KEY}`,
             },
             body: JSON.stringify({
-                model: "llama-3.3-70b-specdec", 
+                model: "llama-3.3-70b-specdec",
                 messages: [
                     { role: "system", content: "Ti si koristan AI glasovni asistent." },
                     { role: "user", content: textMessage }
