@@ -1,10 +1,3 @@
-Evo kompletnog i izmijenjenog koda za app.js.
-
-Ovaj kod sada povlači ključ iz onog novog polja što smo dodali u index.html. Da ti ne bi morao ukucavati ključ svaki put kada osvježiš stranicu, dodao sam i automatsko spašavanje ključa u memoriju pretraživača (localStorage). Čim ga uneseš prvi put, stranica će ga zapamtiti!
-
-Samo kopiraj ovaj cijeli tekst i zamijeni sve unutar svog app.js fajla na GitHubu:
-JavaScript
-
 // ==========================================
 // 1. SUPABASE KONFIGURACIJA & INICIJALIZACIJA
 // ==========================================
@@ -23,13 +16,13 @@ const messageInput = document.getElementById("message");
 const responseDiv = document.getElementById("response");
 const statusDiv = document.getElementById("status");
 const sendBtn = document.getElementById("sendBtn"); 
-const groqKeyInput = document.getElementById("groqKeyInput"); // Novo polje za ključ!
+const groqKeyInput = document.getElementById("groqKeyInput");
 
 let recognition;
 let isSpeakingAI = false;
 let currentSpeechUtterance = null;
 
-// AUTOMATSKO UCITAVANJE KLJUCA: Ako si vec nekad unio kljuc, povuci ga iz memorije
+// AUTOMATSKO UCITAVANJE KLJUCA
 if (groqKeyInput && localStorage.getItem("saved_groq_key")) {
     groqKeyInput.value = localStorage.getItem("saved_groq_key");
 }
@@ -51,26 +44,28 @@ if (!SpeechRecognition) {
         const transcript = event.results[lastResultIndex][0].transcript.trim();
         
         if (transcript.length > 0) {
-            messageInput.value = transcript;
+            if (messageInput) messageInput.value = transcript;
             provjeriIPrekiniAI();
             await sendToBackend(transcript);
         }
     };
 
     recognition.onstart = () => {
-        statusDiv.innerText = "🎙️ AI te sluša uživo... Pričaj slobodno";
-        statusDiv.className = "status-listening";
+        if (statusDiv) {
+            statusDiv.innerText = "🎙️ AI te sluša uživo... Pričaj slobodno";
+            statusDiv.className = "status-listening";
+        }
     };
 
     recognition.onerror = (event) => {
         console.error("STT Greška:", event.error);
-        if(event.error === 'not-allowed') {
+        if(event.error === 'not-allowed' && statusDiv) {
             statusDiv.innerText = "❌ Nema dozvole za mikrofon!";
         }
     };
 
     recognition.onend = () => {
-        if (!stopBtn.disabled) {
+        if (stopBtn && !stopBtn.disabled) {
             recognition.start();
         }
     };
@@ -81,8 +76,10 @@ function provjeriIPrekiniAI() {
         console.log("Korisnik je prekinuo AI. Zaustavljam audio...");
         speechSynthesis.cancel(); 
         isSpeakingAI = false;
-        statusDiv.innerText = "Prekinuo si AI. Slušam te...";
-        statusDiv.className = "status-listening";
+        if (statusDiv) {
+            statusDiv.innerText = "Prekinuo si AI. Slušam te...";
+            statusDiv.className = "status-listening";
+        }
     }
 }
 
@@ -90,26 +87,26 @@ function provjeriIPrekiniAI() {
 // 4. SLANJE NA GROQ API & SPAŠAVANJE U BAZU
 // ==========================================
 async function sendToBackend(textMessage) {
-    // Uzmi ključ iz polja na stranici
     const GROQ_API_KEY = groqKeyInput ? groqKeyInput.value.trim() : "";
 
-    // Provjera da li je korisnik uopšte unio ključ
     if (!GROQ_API_KEY) {
-        statusDiv.innerText = "❌ Greška: Nedostaje API ključ!";
-        statusDiv.className = "status-idle";
-        responseDiv.innerHTML = "Molimo unesite vaš Groq API ključ u polje na vrhu stranice.";
+        if (statusDiv) {
+            statusDiv.innerText = "❌ Greška: Nedostaje API ključ!";
+            statusDiv.className = "status-idle";
+        }
+        if (responseDiv) responseDiv.innerHTML = "Molimo unesite vaš Groq API ključ u polje na vrhu stranice.";
         return;
     }
 
-    // Spasi ključ u memoriju pretraživača da se ne mora kucati ponovo
     localStorage.setItem("saved_groq_key", GROQ_API_KEY);
 
-    statusDiv.innerText = "🤔 AI razmišlja...";
-    statusDiv.className = "status-thinking";
-    responseDiv.innerHTML = "Generišem odgovor...";
+    if (statusDiv) {
+        statusDiv.innerText = "🤔 AI razmišlja...";
+        statusDiv.className = "status-thinking";
+    }
+    if (responseDiv) responseDiv.innerHTML = "Generišem odgovor...";
 
     try {
-        // Šaljemo direktan zahtjev na službeni Groq API server
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -127,24 +124,24 @@ async function sendToBackend(textMessage) {
 
         const data = await response.json();
         
-        // Provjera da li je Groq vratio grešku zbog nevažećeg ključa
         if (data.error) {
             throw new Error(data.error.message);
         }
 
         const aiReply = data.choices[0].message.content;
         
-        responseDiv.innerHTML = aiReply;
+        if (responseDiv) responseDiv.innerHTML = aiReply;
         speakAI(aiReply);
 
-        // Zapiši podatke u Supabase
         await spasiRazgovorUBazu(textMessage, aiReply);
 
     } catch (error) {
         console.error("Greška:", error);
-        statusDiv.innerText = "❌ Greška pri komunikaciji sa AI!";
-        responseDiv.innerHTML = "Došlo je do greške: " + error.message;
-        statusDiv.className = "status-idle";
+        if (statusDiv) {
+            statusDiv.innerText = "❌ Greška pri komunikaciji sa AI!";
+            statusDiv.className = "status-idle";
+        }
+        if (responseDiv) responseDiv.innerHTML = "Došlo je do greške: " + error.message;
     }
 }
 
@@ -181,14 +178,18 @@ function speakAI(text) {
 
     currentSpeechUtterance.onstart = () => {
         isSpeakingAI = true;
-        statusDiv.innerText = "🔊 AI priča... (Slobodno upadni u riječ)";
-        statusDiv.className = "status-speaking";
+        if (statusDiv) {
+            statusDiv.innerText = "🔊 AI priča... (Slobodno upadni u riječ)";
+            statusDiv.className = "status-speaking";
+        }
     };
 
     currentSpeechUtterance.onend = () => {
         isSpeakingAI = false;
-        statusDiv.innerText = "🎙️ AI je završio. Slušam te...";
-        statusDiv.className = "status-listening";
+        if (statusDiv) {
+            statusDiv.innerText = "🎙️ AI je završio. Slušam te...";
+            statusDiv.className = "status-listening";
+        }
     };
 
     speechSynthesis.speak(currentSpeechUtterance);
@@ -199,39 +200,47 @@ function speakAI(text) {
 // ==========================================
 if (sendBtn) {
     sendBtn.addEventListener("click", async () => {
+        if (!messageInput) return;
         const typedText = messageInput.value.trim();
         
         if (typedText !== "") {
             provjeriIPrekiniAI(); 
-            messageInput.value = ""; // Odmah isprazni box čim klikneš dugme
+            messageInput.value = ""; 
             await sendToBackend(typedText); 
         }
     });
 }
 
-// Slušalac za pritisak tipke Enter unutar tekstualnog polja
-messageInput.addEventListener("keydown", async (event) => {
-    if (event.key === "Enter") {
-        event.preventDefault(); // Zaustavi prelazak u novi red
-        if (sendBtn) sendBtn.click(); // Okini klik na dugme za slanje
-    }
-});
+if (messageInput) {
+    messageInput.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault(); 
+            if (sendBtn) sendBtn.click(); 
+        }
+    });
+}
 
 // ==========================================
 // 7. KONTROLE OSTALIH DUGMIĆA
 // ==========================================
-startBtn.addEventListener("click", () => {
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    if (recognition) recognition.start();
-});
+if (startBtn) {
+    startBtn.addEventListener("click", () => {
+        startBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = false;
+        if (recognition) recognition.start();
+    });
+}
 
-stopBtn.addEventListener("click", () => {
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    if (recognition) recognition.stop();
-    speechSynthesis.cancel();
-    isSpeakingAI = false;
-    statusDiv.innerText = "Razgovor zaustavljen.";
-    statusDiv.className = "status-idle";
-});
+if (stopBtn) {
+    stopBtn.addEventListener("click", () => {
+        if (startBtn) startBtn.disabled = false;
+        stopBtn.disabled = true;
+        if (recognition) recognition.stop();
+        speechSynthesis.cancel();
+        isSpeakingAI = false;
+        if (statusDiv) {
+            statusDiv.innerText = "Razgovor zaustavljen.";
+            statusDiv.className = "status-idle";
+        }
+    });
+}
